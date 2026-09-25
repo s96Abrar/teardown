@@ -66,7 +66,7 @@ menu_brew() {
     cellar="/opt/homebrew/Cellar"
     [[ -d "/usr/local/Cellar" ]] && cellar="/usr/local/Cellar"
     row "Cellar" "$(dir_size "$cellar")"
-    row "Cache" "$(dir_size "$cache_dir")"
+    row "Cache"  "$(dir_size "$cache_dir")"
     dim "$cache_dir"
 
     sec "Outdated"
@@ -104,8 +104,8 @@ menu_node() {
     header "📦  Node / NPM"
 
     sec "Versions"
-    has node && ok "node  $(node -v)"     || fail "node not installed"
-    has npm  && ok "npm   v$(npm -v)"    || fail "npm not installed"
+    has node && ok "node  $(node -v)"          || fail "node not installed"
+    has npm  && ok "npm   v$(npm -v)"         || fail "npm not installed"
     has yarn && ok "yarn  $(yarn -v)"
     has pnpm && ok "pnpm  $(pnpm -v)"
     has bun  && ok "bun   $(bun --version 2>/dev/null)"
@@ -115,7 +115,7 @@ menu_node() {
       local npm_cache npm_global
       npm_cache=$(npm config get cache 2>/dev/null)
       npm_global=$(npm root -g 2>/dev/null)
-      row "npm cache" "$(dir_size "$npm_cache")"
+      row "npm cache"   "$(dir_size "$npm_cache")"
       row "npm globals" "$(dir_size "$npm_global")"
     fi
     if has yarn; then
@@ -136,7 +136,7 @@ menu_node() {
     printf "  Choice: "; read -r ch
 
     case $ch in
-      1) if ! has npm; then fail "npm not found"; press_enter; continue; fi
+      1) if ! has npm;  then fail "npm not found";  press_enter; continue; fi
          if confirm "Run: npm cache clean --force"; then
            npm cache clean --force; ok "Done"; press_enter; fi ;;
       2) if ! has yarn; then fail "yarn not found"; press_enter; continue; fi
@@ -210,10 +210,10 @@ menu_rust() {
     rustup target list --installed 2>/dev/null | sed 's/^/    /'
 
     sec "Disk Usage"
-    row "~/.rustup"          "$(dir_size "$HOME/.rustup")"
-    row "~/.cargo"           "$(dir_size "$HOME/.cargo")"
-    row "  registry/cache"   "$(dir_size "$HOME/.cargo/registry/cache")"
-    row "  git"              "$(dir_size "$HOME/.cargo/git")"
+    row "~/.rustup"         "$(dir_size "$HOME/.rustup")"
+    row "~/.cargo"          "$(dir_size "$HOME/.cargo")"
+    row "  registry/cache"  "$(dir_size "$HOME/.cargo/registry/cache")"
+    row "  git"             "$(dir_size "$HOME/.cargo/git")"
 
     sep
     printf "  ${BOLD}[1]${RST}  Uninstall a toolchain\n"
@@ -453,6 +453,77 @@ menu_sim() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# DOCKER
+# ═══════════════════════════════════════════════════════════════════════════════
+menu_docker() {
+  while true; do
+    header "🐳  Docker"
+    if ! has docker; then fail "Docker not found"; press_enter; return; fi
+
+    # Verify daemon is reachable
+    if ! docker info &>/dev/null; then
+      fail "Docker daemon not running — start Docker Desktop first"
+      press_enter; return
+    fi
+
+    sec "Version"
+    docker --version 2>/dev/null | sed 's/^/  /'
+    docker compose version 2>/dev/null | sed 's/^/  /' || true
+
+    sec "Disk Usage"
+    docker system df 2>/dev/null | sed 's/^/  /'
+
+    sec "Resources"
+    local imgs conts vols
+    imgs=$(docker images  -q   2>/dev/null | wc -l | tr -d ' ')
+    conts=$(docker ps    -aq   2>/dev/null | wc -l | tr -d ' ')
+    vols=$(docker volume ls -q 2>/dev/null | wc -l | tr -d ' ')
+    row "Images"            "$imgs"
+    row "Containers (all)"  "$conts"
+    row "Volumes"           "$vols"
+
+    sec "Running Containers"
+    local running
+    running=$(docker ps --format "{{.Names}}  {{.Status}}  {{.Image}}" 2>/dev/null)
+    [[ -n "$running" ]] && echo "$running" | sed 's/^/    /' || dim "None running"
+
+    sep
+    printf "  ${BOLD}[1]${RST}  system prune          ${DIM}(stopped containers, dangling images, unused networks)${RST}\n"
+    printf "  ${BOLD}[2]${RST}  system prune -a       ${DIM}(+ ALL unused images — not just dangling)${RST}\n"
+    printf "  ${BOLD}[3]${RST}  image prune           ${DIM}(dangling images only)${RST}\n"
+    printf "  ${BOLD}[4]${RST}  image prune -a        ${DIM}(all unused images)${RST}\n"
+    printf "  ${BOLD}[5]${RST}  container prune       ${DIM}(stopped containers)${RST}\n"
+    printf "  ${BOLD}[6]${RST}  volume prune          ${RED}(⚠  db data and uploads may be lost!)${RST}\n"
+    printf "  ${BOLD}[7]${RST}  builder prune         ${DIM}(dangling build cache layers)${RST}\n"
+    printf "  ${BOLD}[8]${RST}  builder prune -a      ${DIM}(all build cache)${RST}\n"
+    printf "  ${BOLD}[b]${RST}  ← Back\n\n"
+    printf "  Choice: "; read -r ch
+
+    case $ch in
+      1) if confirm "Run: docker system prune?"; then
+           docker system prune -f; ok "Done"; press_enter; fi ;;
+      2) if confirm "Run: docker system prune -a? (removes ALL unused images)"; then
+           docker system prune -af; ok "Done"; press_enter; fi ;;
+      3) if confirm "Run: docker image prune?"; then
+           docker image prune -f; ok "Done"; press_enter; fi ;;
+      4) if confirm "Run: docker image prune -a?"; then
+           docker image prune -af; ok "Done"; press_enter; fi ;;
+      5) if confirm "Run: docker container prune?"; then
+           docker container prune -f; ok "Done"; press_enter; fi ;;
+      6) warn "Volumes may contain database data, uploads, or other persistent state."
+         warn "Containers using a volume must be stopped first or the volume is skipped."
+         if confirm "⚠  Run: docker volume prune?"; then
+           docker volume prune -f; ok "Done"; press_enter; fi ;;
+      7) if confirm "Run: docker builder prune?"; then
+           docker builder prune -f; ok "Done"; press_enter; fi ;;
+      8) if confirm "Run: docker builder prune -a? (removes ALL build cache)"; then
+           docker builder prune -af; ok "Done"; press_enter; fi ;;
+      b|B) return ;;
+    esac
+  done
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
 _check_tool() {
@@ -468,6 +539,7 @@ _check_tool() {
       gradle)     ver=$(gradle --version 2>/dev/null | grep "^Gradle" | awk '{print $2}') ;;
       xcodebuild) ver=$(xcodebuild -version 2>/dev/null | head -1 | awk '{print $2}') ;;
       xcrun)      ver="CLT installed" ;;
+      docker)     ver=$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',') ;;
     esac
     printf "  ${GRN}✓${RST} %-24s ${DIM}%s${RST}\n" "$label" "$ver"
   else
@@ -489,6 +561,7 @@ summary() {
   _check_tool "Gradle"              gradle
   _check_tool "Xcode"               xcodebuild
   _check_tool "Simulator (xcrun)"   xcrun
+  _check_tool "Docker"              docker
 
   printf "\n  ${BOLD}${CYN}Disk Usage${RST}\n"
   sep
@@ -522,6 +595,23 @@ summary() {
   row "📱  CoreSimulator"        "$(dir_size "$CS")"
   row "    Devices"              "$(dir_size "$CS/Devices")"
 
+  if has docker && docker info &>/dev/null 2>&1; then
+    local df_out img_size cont_size vol_size cache_size
+    df_out=$(docker system df 2>/dev/null)
+    img_size=$(echo   "$df_out" | awk '/^Images/     {print $4}')
+    cont_size=$(echo  "$df_out" | awk '/^Containers/ {print $4}')
+    vol_size=$(echo   "$df_out" | awk '/Volumes/     {print $5}')
+    cache_size=$(echo "$df_out" | awk '/Cache/       {print $5}')
+    printf "\n"
+    row "🐳  Docker Images"       "${img_size:-—}"
+    row "    Containers"          "${cont_size:-—}"
+    row "    Local Volumes"       "${vol_size:-—}"
+    row "    Build Cache"         "${cache_size:-—}"
+  elif has docker; then
+    printf "\n"
+    row "🐳  Docker"  "${DIM}daemon not running${RST}"
+  fi
+
   press_enter
 }
 
@@ -538,8 +628,10 @@ clean_all() {
   printf "  ${GRN}•${RST} ~/.cargo/registry/cache + ~/.cargo/git\n"
   printf "  ${GRN}•${RST} ~/.gradle/caches + daemon + wrapper\n"
   printf "  ${GRN}•${RST} Xcode DerivedData + Cache + Device Support + SPM\n"
-  printf "  ${GRN}•${RST} xcrun simctl delete unavailable\n\n"
-  warn "Archives, AVDs, and Simulator app data are NOT touched."
+  printf "  ${GRN}•${RST} xcrun simctl delete unavailable\n"
+  printf "  ${GRN}•${RST} docker system prune  ${DIM}(stopped containers, dangling images, unused networks)${RST}\n"
+  printf "  ${GRN}•${RST} docker builder prune ${DIM}(dangling build cache layers)${RST}\n\n"
+  warn "Archives, AVDs, Simulator app data, and Docker volumes are NOT touched."
 
   if ! confirm "Proceed with full cleanup?"; then return; fi
   printf "\n"
@@ -551,13 +643,17 @@ clean_all() {
     else printf "${YLW}skipped${RST}\n"; fi
   }
 
-  has brew       && _step "Brew"        brew cleanup --prune=all
-  has npm        && _step "npm"         npm cache clean --force
-  has pip3       && _step "pip3"        pip3 cache purge
-  _step "Cargo cache"       rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/git"
-  _step "Gradle"            rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/daemon" "$HOME/.gradle/wrapper"
-  has xcodebuild && _step "Xcode"       rm -rf "$XDD" "$XC" "$XDS" "$SPM"
-  has xcrun      && _step "Simulators"  xcrun simctl delete unavailable
+  has brew       && _step "Brew"           brew cleanup --prune=all
+  has npm        && _step "npm"            npm cache clean --force
+  has pip3       && _step "pip3"           pip3 cache purge
+  _step "Cargo cache"          rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/git"
+  _step "Gradle"               rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/daemon" "$HOME/.gradle/wrapper"
+  has xcodebuild && _step "Xcode"          rm -rf "$XDD" "$XC" "$XDS" "$SPM"
+  has xcrun      && _step "Simulators"     xcrun simctl delete unavailable
+  if has docker && docker info &>/dev/null 2>&1; then
+    _step "Docker system"      docker system prune -f
+    _step "Docker builder"     docker builder prune -f
+  fi
 
   printf "\n"
   ok "All done! Run [s] Summary to see freed space."
@@ -585,6 +681,7 @@ main() {
     printf "  ${BOLD}[6]${RST}  🐘  Gradle\n"
     printf "  ${BOLD}[7]${RST}  🔨  Xcode\n"
     printf "  ${BOLD}[8]${RST}  📱  Simulator\n"
+    printf "  ${BOLD}[9]${RST}  🐳  Docker\n"
     sep
     printf "  ${BOLD}${RED}[c]${RST}  🧹  Clean All\n"
     printf "  ${BOLD}[q]${RST}  Quit\n\n"
@@ -600,6 +697,7 @@ main() {
       6)   menu_gradle ;;
       7)   menu_xcode ;;
       8)   menu_sim ;;
+      9)   menu_docker ;;
       c|C) clean_all ;;
       q|Q) printf "\n  ${DIM}Bye!${RST}\n\n"; exit 0 ;;
     esac

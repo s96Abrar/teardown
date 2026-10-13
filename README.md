@@ -74,6 +74,7 @@ chmod +x dev-cleanup.sh && ./dev-cleanup.sh
 | **6** 🐘 | Gradle | clean `caches` / `daemon` / `wrapper` |
 | **7** 🔨 | Xcode | DerivedData, DeviceSupport, caches, Archives ⚠️ |
 | **8** 📱 | iOS Simulator | remove unavailable sims, caches, erase all ⚠️ |
+| **10** ⚡ | uv | `uv cache prune` / `clean`, list Pythons + tools |
 | **s** 📊 | **Summary** | version table + full disk-usage breakdown |
 | **c** 🧹 | **Clean All** | one-shot sweep, `✓ done / skipped` per step |
 | **q** 🚪 | Quit | |

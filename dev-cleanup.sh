@@ -191,6 +191,44 @@ menu_pip() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# UV
+# ═══════════════════════════════════════════════════════════════════════════════
+menu_uv() {
+  while true; do
+    header "⚡  uv"
+    if ! has uv; then fail "uv not found"; press_enter; return; fi
+
+    sec "Version"
+    uv --version 2>/dev/null | sed 's/^/  /'
+
+    sec "Disk Usage"
+    local ud; ud=$(uv cache dir 2>/dev/null)
+    row "Cache" "$(dir_size "$ud")"
+    dim "$ud"
+    local up; up=$(uv python dir 2>/dev/null)
+    row "Managed Pythons" "$(dir_size "$up")"
+    dim "$up"
+
+    sep
+    printf "  ${BOLD}[1]${RST}  uv cache prune  ${DIM}(unused entries only)${RST}\n"
+    printf "  ${BOLD}[2]${RST}  uv cache clean  ${DIM}(entire cache)${RST}\n"
+    printf "  ${BOLD}[3]${RST}  List installed Pythons + tools\n"
+    printf "  ${BOLD}[b]${RST}  ← Back\n\n"
+    printf "  Choice: "; read -r ch
+
+    case $ch in
+      1) if confirm "Run: uv cache prune"; then
+           uv cache prune; ok "Done"; press_enter; fi ;;
+      2) if confirm "Run: uv cache clean"; then
+           uv cache clean; ok "Done"; press_enter; fi ;;
+      3) sec "Pythons"; uv python list --only-installed 2>/dev/null | sed 's/^/    /'
+         sec "Tools";   uv tool list 2>/dev/null | sed 's/^/    /'; press_enter ;;
+      b|B) return ;;
+    esac
+  done
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RUSTUP / CARGO
 # ═══════════════════════════════════════════════════════════════════════════════
 menu_rust() {
@@ -534,6 +572,7 @@ _check_tool() {
       node)       ver=$(node -v 2>/dev/null) ;;
       npm)        ver="v$(npm -v 2>/dev/null)" ;;
       pip3)       ver=$(pip3 --version 2>/dev/null | awk '{print $2}') ;;
+      uv)         ver=$(uv --version 2>/dev/null | awk '{print $2}') ;;
       rustup)     ver=$(rustup --version 2>/dev/null | awk '{print $2}') ;;
       rustc)      ver=$(rustc --version 2>/dev/null | awk '{print $2}') ;;
       gradle)     ver=$(gradle --version 2>/dev/null | grep "^Gradle" | awk '{print $2}') ;;
@@ -556,6 +595,7 @@ summary() {
   _check_tool "Node.js"             node
   _check_tool "npm"                 npm
   _check_tool "pip3"                pip3
+  _check_tool "uv"                  uv
   _check_tool "rustup"              rustup
   _check_tool "rustc / cargo"       rustc
   _check_tool "Gradle"              gradle
@@ -579,6 +619,7 @@ summary() {
   row "    Brew Cache"           "$brew_cache"
   row "📦  npm cache"            "$npm_cache"
   row "🐍  pip3 cache"           "$pip_cache"
+  has uv && row "⚡  uv cache"             "$(dir_size "$(uv cache dir 2>/dev/null)")"
   row "🦀  ~/.rustup"            "$(dir_size "$HOME/.rustup")"
   row "    ~/.cargo"             "$(dir_size "$HOME/.cargo")"
   row "🤖  Android SDK"          "$(dir_size "${ANDROID_HOME:-$HOME/Library/Android/sdk}")"
@@ -625,6 +666,7 @@ clean_all() {
   printf "  ${GRN}•${RST} brew cleanup --prune=all\n"
   printf "  ${GRN}•${RST} npm cache clean --force\n"
   printf "  ${GRN}•${RST} pip3 cache purge\n"
+  printf "  ${GRN}•${RST} uv cache prune\n"
   printf "  ${GRN}•${RST} ~/.cargo/registry/cache + ~/.cargo/git\n"
   printf "  ${GRN}•${RST} ~/.gradle/caches + daemon + wrapper\n"
   printf "  ${GRN}•${RST} Xcode DerivedData + Cache + Device Support + SPM\n"
@@ -646,6 +688,7 @@ clean_all() {
   has brew       && _step "Brew"           brew cleanup --prune=all
   has npm        && _step "npm"            npm cache clean --force
   has pip3       && _step "pip3"           pip3 cache purge
+  has uv         && _step "uv"             uv cache prune
   _step "Cargo cache"          rm -rf "$HOME/.cargo/registry/cache" "$HOME/.cargo/git"
   _step "Gradle"               rm -rf "$HOME/.gradle/caches" "$HOME/.gradle/daemon" "$HOME/.gradle/wrapper"
   has xcodebuild && _step "Xcode"          rm -rf "$XDD" "$XC" "$XDS" "$SPM"
@@ -682,6 +725,7 @@ main() {
     printf "  ${BOLD}[7]${RST}  🔨  Xcode\n"
     printf "  ${BOLD}[8]${RST}  📱  Simulator\n"
     printf "  ${BOLD}[9]${RST}  🐳  Docker\n"
+    printf "  ${BOLD}[10]${RST} ⚡  uv\n"
     sep
     printf "  ${BOLD}${RED}[c]${RST}  🧹  Clean All\n"
     printf "  ${BOLD}[q]${RST}  Quit\n\n"
@@ -698,6 +742,7 @@ main() {
       7)   menu_xcode ;;
       8)   menu_sim ;;
       9)   menu_docker ;;
+      10)  menu_uv ;;
       c|C) clean_all ;;
       q|Q) printf "\n  ${DIM}Bye!${RST}\n\n"; exit 0 ;;
     esac
